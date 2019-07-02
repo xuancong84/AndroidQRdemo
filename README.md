@@ -1,8 +1,8 @@
 # Android QR demo
-Android QR demo with minimal external dependencies (except Google API)
+Android QR demo with minimal external dependencies (except Google API).
 
-![](Screenshot_1.png | width=100)
+You can view the QR raw text and copy into clipboard.
 
-![](Screenshot_2.jpg | width=100)
+<img src="Screenshot_1.png" width="48%"> <img src="Screenshot_2.jpg" width="48%">
 
 You can easily import the code into any Android project for scanning QR code.
