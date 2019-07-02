@@ -1,0 +1,11 @@
+<resources>
+    <string name="app_name">AndroidQRdemo</string>
+
+    <!-- QR Camera Keys -->
+    <string name="low_storage_error">low storage error</string>
+    <string name="no_camera_permission">camera permission not given</string>
+    <string name="ok">Ok</string>
+    <string name="no_barcode_captured">no barcode captured</string>
+    <string name="barcode_error_format">Invalid QR code format</string>
+    <string name="title_activity_qrcode">Scan QR Code</string>
+</resources>
