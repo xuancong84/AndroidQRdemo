@@ -20,14 +20,12 @@ import android.Manifest;
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.graphics.ImageFormat;
-import android.graphics.SurfaceTexture;
 import android.hardware.Camera;
 import android.hardware.Camera.CameraInfo;
 import android.os.Build;
 import android.os.SystemClock;
 import android.util.Log;
 import android.view.SurfaceHolder;
-import android.view.SurfaceView;
 import android.view.WindowManager;
 
 import androidx.annotation.RequiresPermission;
@@ -43,6 +41,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+import static android.hardware.Camera.Parameters.FOCUS_MODE_AUTO;
+import static android.hardware.Camera.Parameters.FOCUS_MODE_CONTINUOUS_PICTURE;
 
 // Note: This requires Google Play Services 8.1 or higher, due to using indirect byte buffers for
 // storing images.
@@ -69,46 +70,16 @@ public class CameraSource {
 
 	private static final String TAG = "OpenCameraSource";
 
-	/**
-	 * The dummy surface texture must be assigned a chosen name.  Since we never use an OpenGL
-	 * context, we can choose any ID we want here.
-	 */
-	private static final int DUMMY_TEXTURE_NAME = 100;
-
-	/**
-	 * If the absolute difference between a preview size aspect ratio and a picture size aspect
-	 * ratio is less than this tolerance, they are considered to be the same aspect ratio.
-	 */
+	/** If the absolute difference between a preview size aspect ratio and a picture size aspect
+	 * ratio is less than this tolerance, they are considered to be the same aspect ratio. */
 	private static final float ASPECT_RATIO_TOLERANCE = 0.01f;
-//
-//	@StringDef({
-//			Camera.Parameters.FOCUS_MODE_CONTINUOUS_PICTURE,
-//			Camera.Parameters.FOCUS_MODE_CONTINUOUS_VIDEO,
-//			Camera.Parameters.FOCUS_MODE_AUTO,
-//			Camera.Parameters.FOCUS_MODE_EDOF,
-//			Camera.Parameters.FOCUS_MODE_FIXED,
-//			Camera.Parameters.FOCUS_MODE_INFINITY,
-//			Camera.Parameters.FOCUS_MODE_MACRO
-//	})
-//	@Retention(RetentionPolicy.SOURCE)
-//	private @interface FocusMode {}
-//
-//	@StringDef({
-//			Camera.Parameters.FLASH_MODE_ON,
-//			Camera.Parameters.FLASH_MODE_OFF,
-//			Camera.Parameters.FLASH_MODE_AUTO,
-//			Camera.Parameters.FLASH_MODE_RED_EYE,
-//			Camera.Parameters.FLASH_MODE_TORCH
-//	})
-//	@Retention(RetentionPolicy.SOURCE)
-//	private @interface FlashMode {}
 
 	private Context mContext;
 
 	private final Object mCameraLock = new Object();
 
 	// Guarded by mCameraLock
-	private Camera mCamera;
+	public Camera mCamera;
 
 	private int mFacing = CAMERA_FACING_BACK;
 
@@ -126,15 +97,7 @@ public class CameraSource {
 	public static int mRequestedPreviewWidth = 1024;
 	public static int mRequestedPreviewHeight = 768;
 
-
-	private String mFocusMode = null;
-	private String mFlashMode = null;
-
-	// These instances need to be held onto to avoid GC of their underlying resources.  Even though
-	// these aren't used outside of the method that creates them, they still must have hard
-	// references maintained to them.
-	private SurfaceView mDummySurfaceView;
-	private SurfaceTexture mDummySurfaceTexture;
+	public int requestedCameraId;
 
 	/**
 	 * Dedicated thread and associated runnable for calling into the detector with frames, as the
@@ -183,16 +146,6 @@ public class CameraSource {
 			if (fps <= 0)
 				throw new IllegalArgumentException("Invalid fps: " + fps);
 			mCameraSource.mRequestedFps = fps;
-			return this;
-		}
-
-		public Builder setFocusMode( String mode ) {
-			mCameraSource.mFocusMode = mode;
-			return this;
-		}
-
-		public Builder setFlashMode( String mode ) {
-			mCameraSource.mFlashMode = mode;
 			return this;
 		}
 
@@ -267,9 +220,8 @@ public class CameraSource {
 			mFrameProcessor.setActive(false);
 			if (mProcessingThread != null) {
 				try {
-					// Wait for the thread to complete to ensure that we can't have multiple threads
-					// executing at the same time (i.e., which would happen if we called start too
-					// quickly after stop).
+					// Wait for the thread to complete to ensure that we can't have multiple threads executing
+					// at the same time (i.e., which would happen if we called start too quickly after stop).
 					mProcessingThread.join();
 				} catch (InterruptedException e) {
 					Log.d(TAG, "Frame processing thread interrupted on release.");
@@ -312,27 +264,27 @@ public class CameraSource {
 	 * @throws RuntimeException if the method fails */
 	@SuppressLint("InlinedApi")
 	private Camera createCamera() {
-		int requestedCameraId = getIdForRequestedCamera(mFacing);
+		requestedCameraId = getIdForRequestedCamera(mFacing);
 		if (requestedCameraId == -1)
 			throw new RuntimeException("Could not find requested camera.");
 		Camera camera = Camera.open(requestedCameraId);
 
-		SizePair sizePair = selectSizePair(camera, mRequestedPreviewWidth, mRequestedPreviewHeight);
-		if (sizePair == null)
+		SizePair sizePair = selectSizePair( camera, mRequestedPreviewWidth, mRequestedPreviewHeight );
+		if ( sizePair == null )
 			throw new RuntimeException("Could not find suitable preview size.");
 		Size pictureSize = sizePair.pictureSize();
 		mPreviewSize = sizePair.previewSize();
 
-		int[] previewFpsRange = selectPreviewFpsRange(camera, mRequestedFps);
+		int[] previewFpsRange = selectPreviewFpsRange( camera, mRequestedFps );
 		if (previewFpsRange == null)
 			throw new RuntimeException("Could not find suitable preview frames per second range.");
 
 		Camera.Parameters parameters = camera.getParameters();
 
-		if (pictureSize != null)
-			parameters.setPictureSize(pictureSize.getWidth(), pictureSize.getHeight());
+		if ( pictureSize != null )
+			parameters.setPictureSize( pictureSize.getWidth(), pictureSize.getHeight() );
 
-		parameters.setPreviewSize(mPreviewSize.getWidth(), mPreviewSize.getHeight());
+		parameters.setPreviewSize( mPreviewSize.getWidth(), mPreviewSize.getHeight() );
 		parameters.setPreviewFpsRange(
 				previewFpsRange[Camera.Parameters.PREVIEW_FPS_MIN_INDEX],
 				previewFpsRange[Camera.Parameters.PREVIEW_FPS_MAX_INDEX]);
@@ -340,27 +292,10 @@ public class CameraSource {
 
 		setRotation(camera, parameters, requestedCameraId);
 
-		if (mFocusMode != null) {
-			if (parameters.getSupportedFocusModes().contains(mFocusMode))
-				parameters.setFocusMode(mFocusMode);
-			else
-				Log.i(TAG, "Camera focus mode: " + mFocusMode + " is not supported on this device.");
-		}
+		parameters.setFocusMode( Build.VERSION.SDK_INT >= Build.VERSION_CODES.ICE_CREAM_SANDWICH ?
+				FOCUS_MODE_CONTINUOUS_PICTURE : FOCUS_MODE_AUTO );
 
-		// setting mFocusMode to the one set in the params
-		mFocusMode = parameters.getFocusMode();
-
-		if (mFlashMode != null) {
-			if (parameters.getSupportedFlashModes().contains(mFlashMode))
-				parameters.setFlashMode(mFlashMode);
-			else
-				Log.i(TAG, "Camera flash mode: " + mFlashMode + " is not supported on this device.");
-		}
-
-		// setting mFlashMode to the one set in the params
-		mFlashMode = parameters.getFlashMode();
-
-		camera.setParameters(parameters);
+		camera.setParameters( parameters );
 
 		// Four frame buffers are needed for working with the camera:
 		//   one for the frame that is currently being executed upon in doing detection

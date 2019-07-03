@@ -2,6 +2,7 @@
 <RelativeLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/topLayout"
+    android:screenOrientation="portrait"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:layout_gravity="center"
@@ -18,5 +19,17 @@
         android:id="@+id/camera_overlay"
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
+
+    <ImageButton
+        android:id="@+id/torchButton"
+        android:visibility="invisible"
+        android:layout_width="64dp"
+        android:layout_height="64dp"
+        android:alpha="0.5"
+        android:onClick="onToggleTorch"
+        android:layout_centerVertical="true"
+        android:layout_centerHorizontal="true"
+        android:scaleType="fitCenter"
+        android:src="@drawable/torch_off"/>
 
 </RelativeLayout>

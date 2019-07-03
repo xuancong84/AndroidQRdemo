@@ -21,6 +21,7 @@ package com.moht.androidqrdemo;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
+import android.annotation.TargetApi;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
@@ -29,10 +30,11 @@ import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.graphics.PixelFormat;
 import android.hardware.Camera;
-import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.SurfaceView;
+import android.view.View;
+import android.widget.ImageButton;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
@@ -67,6 +69,7 @@ public final class BarcodeCaptureActivity extends AppCompatActivity
 
 	private com.moht.androidqrdemo.CameraSource mCameraSource;
 	private com.moht.androidqrdemo.CameraSourcePreview mPreview;
+	public static ImageButton mTorchButton = null;
 
 	/**
 	 * Initializes the UI and creates the detector pipeline.
@@ -77,6 +80,7 @@ public final class BarcodeCaptureActivity extends AppCompatActivity
 
 		setContentView(R.layout.layout_barcode_capture);
 
+		mTorchButton = findViewById(R.id.torchButton);
 		mPreview = findViewById(R.id.camera_preview);
 		mPreview.mOverlayHolder = ((SurfaceView) findViewById(R.id.camera_overlay)).getHolder();
 		mPreview.mOverlayHolder.setFormat(PixelFormat.RGBA_8888);
@@ -181,15 +185,7 @@ public final class BarcodeCaptureActivity extends AppCompatActivity
 				.setFacing(CameraSource.CAMERA_FACING_BACK)
 				.setRequestedFps(24.0f);
 
-		// make sure that auto focus is an available option
-		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.ICE_CREAM_SANDWICH) {
-			builder = builder.setFocusMode(
-					autoFocus ? Camera.Parameters.FOCUS_MODE_CONTINUOUS_PICTURE : null);
-		}
-
-		mCameraSource = builder
-				.setFlashMode(useFlash ? Camera.Parameters.FLASH_MODE_TORCH : null)
-				.build();
+		mCameraSource = builder.build();
 	}
 
 	// Restarts the camera
@@ -278,6 +274,21 @@ public final class BarcodeCaptureActivity extends AppCompatActivity
 				mCameraSource.release();
 				mCameraSource = null;
 			}
+		}
+	}
+
+	public static boolean torchStatus = false;
+
+	@TargetApi(23)
+	public synchronized void onToggleTorch( View view ) {
+		try {
+			Camera.Parameters parameters = mCameraSource.mCamera.getParameters();
+			parameters.setFlashMode( torchStatus? Camera.Parameters.FLASH_MODE_OFF : Camera.Parameters.FLASH_MODE_TORCH );
+			mCameraSource.mCamera.setParameters( parameters );
+			torchStatus = !torchStatus;
+			mTorchButton.setImageResource( torchStatus ? R.drawable.torch_on : R.drawable.torch_off );
+		} catch ( Exception e ) {
+			Log.e( TAG, "Unable to start torch light.", e );
 		}
 	}
 }
